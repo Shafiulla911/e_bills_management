@@ -1,0 +1,298 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Basmati Rice 5kg",
+      "category": "Grocery",
+      "price": 450,
+      "unit": "bag",
+      "stock": 25,
+      "created_at": "2026-09-14T13:57:22.431Z"
+    },
+    {
+      "id": 2,
+      "name": "Fortune Sunflower Oil 1L",
+      "category": "Grocery",
+      "price": 165,
+      "unit": "bottle",
+      "stock": 40,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 3,
+      "name": "Aashirvaad Atta 10kg",
+      "category": "Grocery",
+      "price": 420,
+      "unit": "bag",
+      "stock": 18,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 4,
+      "name": "Tata Salt 1kg",
+      "category": "Grocery",
+      "price": 28,
+      "unit": "packet",
+      "stock": 100,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 5,
+      "name": "Amul Butter 500g",
+      "category": "Dairy",
+      "price": 275,
+      "unit": "pack",
+      "stock": 15,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 6,
+      "name": "Surf Excel Washing Powder 1kg",
+      "category": "Household",
+      "price": 140,
+      "unit": "packet",
+      "stock": 30,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 7,
+      "name": "Sugar (Fine) 1kg",
+      "category": "Grocery",
+      "price": 44,
+      "unit": "kg",
+      "stock": 80,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 8,
+      "name": "Toor Dal 1kg",
+      "category": "Grocery",
+      "price": 160,
+      "unit": "kg",
+      "stock": 48,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    }
+  ],
+  "customers": [
+    {
+      "id": 1,
+      "name": "Ramesh Patel",
+      "phone": "9876543210",
+      "address": "Shop 4, Market Road",
+      "total_due": 450,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 2,
+      "name": "Suresh Sharma",
+      "phone": "9123456789",
+      "address": "B-12, Sector 5",
+      "total_due": 0,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 3,
+      "name": "Anita Verma",
+      "phone": "9988776655",
+      "address": "House 42, Green Avenue",
+      "total_due": 620,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 4,
+      "name": "Vikram Singh",
+      "phone": "9811223344",
+      "address": "Near Bus Stand",
+      "total_due": 1250,
+      "created_at": "2026-09-14T13:57:22.432Z"
+    }
+  ],
+  "bills": [
+    {
+      "id": 1,
+      "bill_number": "INV-1001",
+      "customer_id": 1,
+      "customer_name": "Ramesh Patel",
+      "customer_phone": "9876543210",
+      "total_amount": 870,
+      "paid_amount": 420,
+      "due_amount": 450,
+      "payment_status": "PARTIAL",
+      "payment_mode": "Cash",
+      "notes": "Paid 420 in cash, 450 balance remaining",
+      "created_at": "2026-09-12T13:57:22.432Z"
+    },
+    {
+      "id": 2,
+      "bill_number": "INV-1002",
+      "customer_id": 3,
+      "customer_name": "Anita Verma",
+      "customer_phone": "9988776655",
+      "total_amount": 620,
+      "paid_amount": 0,
+      "due_amount": 620,
+      "payment_status": "UNPAID",
+      "payment_mode": "Credit/Udhar",
+      "notes": "Promised to clear by weekend",
+      "created_at": "2026-09-13T13:57:22.432Z"
+    },
+    {
+      "id": 3,
+      "bill_number": "INV-1003",
+      "customer_id": 4,
+      "customer_name": "Vikram Singh",
+      "customer_phone": "9811223344",
+      "total_amount": 1750,
+      "paid_amount": 500,
+      "due_amount": 1250,
+      "payment_status": "PARTIAL",
+      "payment_mode": "UPI",
+      "notes": "Paid 500 via GPay, rest remaining",
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 1789394532083,
+      "bill_number": "INV-1004",
+      "customer_id": 4,
+      "customer_name": "Vikram Singh",
+      "customer_phone": "9811223344",
+      "total_amount": 1000,
+      "paid_amount": 1000,
+      "due_amount": 0,
+      "payment_status": "PAID",
+      "payment_mode": "Cash",
+      "notes": "Test partial bill",
+      "created_at": "2026-09-14T14:02:12.083Z"
+    }
+  ],
+  "bill_items": [
+    {
+      "id": 1,
+      "bill_id": 1,
+      "product_id": 3,
+      "product_name": "Aashirvaad Atta 10kg",
+      "price": 420,
+      "quantity": 1,
+      "total": 420
+    },
+    {
+      "id": 2,
+      "bill_id": 1,
+      "product_id": 1,
+      "product_name": "Basmati Rice 5kg",
+      "price": 450,
+      "quantity": 1,
+      "total": 450
+    },
+    {
+      "id": 3,
+      "bill_id": 2,
+      "product_id": 3,
+      "product_name": "Aashirvaad Atta 10kg",
+      "price": 420,
+      "quantity": 1,
+      "total": 420
+    },
+    {
+      "id": 4,
+      "bill_id": 2,
+      "product_id": 2,
+      "product_name": "Fortune Sunflower Oil 1L",
+      "price": 165,
+      "quantity": 1,
+      "total": 165
+    },
+    {
+      "id": 5,
+      "bill_id": 2,
+      "product_id": 4,
+      "product_name": "Tata Salt 1kg",
+      "price": 35,
+      "quantity": 1,
+      "total": 35
+    },
+    {
+      "id": 6,
+      "bill_id": 3,
+      "product_id": 1,
+      "product_name": "Basmati Rice 5kg",
+      "price": 450,
+      "quantity": 2,
+      "total": 900
+    },
+    {
+      "id": 7,
+      "bill_id": 3,
+      "product_id": 5,
+      "product_name": "Amul Butter 500g",
+      "price": 275,
+      "quantity": 2,
+      "total": 550
+    },
+    {
+      "id": 8,
+      "bill_id": 3,
+      "product_id": 2,
+      "product_name": "Fortune Sunflower Oil 1L",
+      "price": 165,
+      "quantity": 1,
+      "total": 165
+    },
+    {
+      "id": 9,
+      "bill_id": 3,
+      "product_id": 6,
+      "product_name": "Surf Excel Washing Powder 1kg",
+      "price": 135,
+      "quantity": 1,
+      "total": 135
+    },
+    {
+      "id": 178939453208300,
+      "bill_id": 1789394532083,
+      "product_id": 8,
+      "product_name": "Toor Dal 1kg",
+      "price": 160,
+      "quantity": 2,
+      "total": 320
+    }
+  ],
+  "payments": [
+    {
+      "id": 1,
+      "bill_id": 1,
+      "customer_id": 1,
+      "amount": 420,
+      "payment_mode": "Cash",
+      "notes": "Initial payment at billing",
+      "created_at": "2026-09-12T13:57:22.432Z"
+    },
+    {
+      "id": 2,
+      "bill_id": 3,
+      "customer_id": 4,
+      "amount": 500,
+      "payment_mode": "UPI",
+      "notes": "Initial UPI payment",
+      "created_at": "2026-09-14T13:57:22.432Z"
+    },
+    {
+      "id": 1789394532084,
+      "bill_id": 1789394532083,
+      "customer_id": 4,
+      "amount": 400,
+      "payment_mode": "Cash",
+      "notes": "Initial payment at invoice creation",
+      "created_at": "2026-09-14T14:02:12.083Z"
+    },
+    {
+      "id": 1789394532088,
+      "bill_id": 1789394532083,
+      "customer_id": 4,
+      "amount": 600,
+      "payment_mode": "UPI",
+      "notes": "Cleared remaining balance via GPay",
+      "created_at": "2026-09-14T14:02:12.088Z"
+    }
+  ]
+}

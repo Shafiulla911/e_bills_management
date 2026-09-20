@@ -26,23 +26,22 @@ const CustomerKhata = ({ customers, bills, onOpenSettleModal, onViewBill, onAddC
     if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
 
     const customerBills = bills.filter(b => b.customer_id === customer.id && b.due_amount > 0);
-    const billsListStr = customerBills.map(b => `• Invoice #${b.bill_number} (${new Date(b.created_at).toLocaleDateString()}): Total ₹${b.total_amount}, Paid ₹${b.paid_amount}, Due ₹${b.due_amount}`).join('\n');
+    const billsSummary = customerBills.map(b => `• Invoice #${b.bill_number} (${new Date(b.created_at).toLocaleDateString()}): Total ₹${b.total_amount}, Paid ₹${b.paid_amount}, Due ₹${b.due_amount}`).join('\n');
 
-    const message = `📜 *KHATA CREDIT STATEMENT* - Patel Super Market
+    const message = `📜 *KHATA CREDIT STATEMENT* - NovaBill Super Store
 ----------------------------------
-👤 *Customer:* ${customer.name}
-📞 *Phone:* ${customer.phone}
+Customer: *${customer.name}*
+Total Remaining Due: *₹${customer.total_due}*
 
-*Pending Unpaid Invoices:*
-${billsListStr || 'No pending individual invoices.'}
+Recent Outstanding Bills:
+${billsSummary}
 
 ----------------------------------
-🔴 *TOTAL OUTSTANDING BALANCE DUE: ₹${customer.total_due}*
-
-Kindly clear the balance at your convenience via Cash or UPI.
+🙏 Kindly clear the pending balance of *₹${customer.total_due}* at your earliest convenience.
+Payment Modes: Cash / UPI / GPay
 
 Thank you!
-*Patel Super Market* 🏪`;
+*NovaBill Super Store* 🏪`;
 
     const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');

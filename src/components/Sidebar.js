@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Receipt, Users, Package, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, Receipt, Users, Package, ShoppingCart, LogOut, Zap } from 'lucide-react';
 
-const Sidebar = ({ currentTab, setCurrentTab, stats }) => {
+const Sidebar = ({ currentTab, setCurrentTab, stats, currentUser, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'create-bill', label: 'Create E-Bill (POS)', icon: ShoppingCart, badge: 'New' },
@@ -31,14 +31,14 @@ const Sidebar = ({ currentTab, setCurrentTab, stats }) => {
             fontSize: '1.4rem',
             boxShadow: '0 4px 12px rgba(99, 102, 241, 0.4)'
           }}>
-            ⚡
+            <Zap size={22} color="#fff" />
           </div>
           <div>
             <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0 }}>
-              QuickBill
+              NovaBill
             </h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-              E-Bill & Udhar Khata
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
+              Next-Gen POS &amp; Khata
             </p>
           </div>
         </div>
@@ -106,34 +106,48 @@ const Sidebar = ({ currentTab, setCurrentTab, stats }) => {
         })}
       </nav>
 
-      {/* Footer Store Info */}
+      {/* Footer Store Info & Logout */}
       <div style={{
         padding: '1rem 1.25rem',
         borderTop: '1px solid var(--border-color)',
         background: 'rgba(11, 15, 25, 0.4)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'rgba(16, 185, 129, 0.2)',
-            border: '1px solid rgba(16, 185, 129, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.85rem'
-          }}>
-            🏪
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', overflow: 'hidden' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #6366f1, #10b981)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.85rem',
+              color: '#fff',
+              fontWeight: 800,
+              flexShrink: 0
+            }}>
+              {(currentUser?.store_name || 'N').charAt(0).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+              <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.store_name || 'NovaBill Store'}
+              </p>
+              <p style={{ fontSize: '0.7rem', color: '#10b981', margin: 0 }}>
+                {currentUser?.username ? `@${currentUser.username}` : 'Vendor Admin'}
+              </p>
+            </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Patel Super Market
-            </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
-              Shopkeeper Portal
-            </p>
-          </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="btn-logout"
+              title="Logout from NovaBill"
+            >
+              <LogOut size={13} />
+              <span>Exit</span>
+            </button>
+          )}
         </div>
       </div>
     </aside>

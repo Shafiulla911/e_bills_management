@@ -163,6 +163,34 @@
       "payment_mode": "Cash",
       "notes": "Test partial bill",
       "created_at": "2026-09-14T14:02:12.083Z"
+    },
+    {
+      "id": 1789918131311,
+      "bill_number": "INV-1005",
+      "customer_id": null,
+      "customer_name": "Vikram Singh",
+      "customer_phone": "9811223344",
+      "total_amount": 3600,
+      "paid_amount": 0,
+      "due_amount": 3600,
+      "payment_status": "UNPAID",
+      "payment_mode": "Cash",
+      "notes": "",
+      "created_at": "2026-09-20T15:28:51.312Z"
+    },
+    {
+      "id": 1789918574114,
+      "bill_number": "INV-1006",
+      "customer_id": null,
+      "customer_name": "Vikram Singh",
+      "customer_phone": "9811223344",
+      "total_amount": 3600,
+      "paid_amount": 0,
+      "due_amount": 3600,
+      "payment_status": "UNPAID",
+      "payment_mode": "Cash",
+      "notes": "",
+      "created_at": "2026-09-20T15:36:14.114Z"
     }
   ],
   "bill_items": [
@@ -255,6 +283,24 @@
       "price": 160,
       "quantity": 2,
       "total": 320
+    },
+    {
+      "id": 178991813131100,
+      "bill_id": 1789918131311,
+      "product_id": null,
+      "product_name": "Mutton",
+      "price": 800,
+      "quantity": 4.5,
+      "total": 3600
+    },
+    {
+      "id": 178991857411400,
+      "bill_id": 1789918574114,
+      "product_id": null,
+      "product_name": "Mutton",
+      "price": 800,
+      "quantity": 4.5,
+      "total": 3600
     }
   ],
   "payments": [
@@ -293,6 +339,19 @@
       "payment_mode": "UPI",
       "notes": "Cleared remaining balance via GPay",
       "created_at": "2026-09-14T14:02:12.088Z"
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "root",
+      "password": "Password",
+      "store_name": "NovaBill Super Store",
+      "owner_name": "Vendor Admin",
+      "phone": "9876543210",
+      "email": "root@novabill.com",
+      "role": "Vendor Admin",
+      "created_at": "2026-09-20T14:31:15.084Z"
     }
   ]
 }

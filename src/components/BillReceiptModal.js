@@ -26,11 +26,45 @@ function numberToWords(num) {
 const BillReceiptModal = ({ bill, onClose, onOpenSettleModal }) => {
   const receiptRef = useRef(null);
 
-  let savedShop = {};
-  try { savedShop = JSON.parse(localStorage.getItem('ebill_shop') || '{}'); } catch (e) {}
-  const shopSignature = bill?.shop_signature || savedShop.signature;
-
   if (!bill) return null;
+
+  let savedShop = {};
+  try {
+    savedShop = JSON.parse(localStorage.getItem('shopSettings') || localStorage.getItem('ebill_shop') || '{}');
+  } catch (e) {}
+
+  const shopName = bill.shop_name || savedShop.name || 'NovaBill Super Store';
+  const shopAddress = bill.shop_address || savedShop.address || 'Shop No. 4, Main Market Road, City';
+  const shopPhone = bill.shop_phone || savedShop.phone || '9876543210';
+  const shopSignature = bill.shop_signature || savedShop.signature;
+
+  const billNo = bill.bill_number || bill.billNo || `BILL-${bill.id || '1001'}`;
+  const customerName = bill.customer_name || bill.customer || 'Walk-in Customer';
+  const customerPhone = bill.customer_phone || bill.phone || '';
+  const totalAmt = parseFloat(bill.total_amount !== undefined ? bill.total_amount : (bill.total || 0));
+  const paidAmt = parseFloat(bill.paid_amount !== undefined ? bill.paid_amount : (bill.paid || 0));
+  const dueAmt = parseFloat(bill.due_amount !== undefined ? bill.due_amount : (bill.balance !== undefined ? bill.balance : Math.max(0, totalAmt - paidAmt)));
+  const dateObj = bill.created_at ? new Date(bill.created_at) : (bill.date ? new Date(bill.date + (String(bill.date).length === 10 ? 'T00:00:00' : '')) : new Date());
+  const isValidDate = !isNaN(dateObj.getTime());
+  const billDate = isValidDate ? dateObj.toLocaleDateString('en-GB') : (bill.date || new Date().toLocaleDateString('en-GB'));
+  const billDay = isValidDate ? dateObj.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const paymentStatus = bill.payment_status || (dueAmt === 0 ? 'PAID' : (paidAmt > 0 ? 'PARTIAL' : 'UNPAID'));
+
+  const itemsList = (bill.items || []).map(i => {
+    const qty = parseFloat(i.quantity !== undefined ? i.quantity : (i.qty || 1)) || 1;
+    const price = parseFloat(i.price !== undefined ? i.price : (i.rate || 0)) || 0;
+    const lineTotal = parseFloat(i.total !== undefined ? i.total : (qty * price)) || 0;
+    return {
+      name: i.product_name || i.name || 'Item',
+      quantity: qty,
+      unit: i.unit || 'pcs',
+      price: price,
+      total: lineTotal
+    };
+  });
+
+  const emptyRowsCount = Math.max(0, 4 - itemsList.length);
+  const amountInWords = numberToWords(totalAmt);
 
   const handlePrint = () => {
     window.print();
@@ -39,13 +73,13 @@ const BillReceiptModal = ({ bill, onClose, onOpenSettleModal }) => {
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
     try {
-      const canvas = await html2canvas(receiptRef.current, { scale: 2 });
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`E-Bill_${bill.bill_number}.pdf`);
+      pdf.save(`NovaBill_${billNo}.pdf`);
     } catch (err) {
       console.error('PDF generation error:', err);
       alert('Error generating PDF download');
@@ -53,48 +87,44 @@ const BillReceiptModal = ({ bill, onClose, onOpenSettleModal }) => {
   };
 
   const handleSendWhatsApp = () => {
-    let phone = bill.customer_phone ? bill.customer_phone.replace(/\D/g, '') : '';
+    let phone = customerPhone.replace(/\D/g, '');
     if (phone.length === 10) phone = '91' + phone;
 
-    const itemsSummary = (bill.items || [])
-      .map((i, idx) => `${idx + 1}. ${i.product_name} (${i.quantity}) = ₹${i.total}`)
+    const itemsSummary = itemsList
+      .map((i, idx) => `${idx + 1}. ${i.name} (${i.quantity} ${i.unit}) = ₹${i.total.toFixed(2)}`)
       .join('\n');
-
-    const amountInWords = numberToWords(bill.total_amount);
 
     const message = `🧾 *E-BILL INVOICE RECEIPT*
 ----------------------------------
-🏪 *PATEL SUPER MARKET*
-📍 Shop 4, Main Market Road
-📞 Phone: +91 98765 43210
+🏪 *${shopName.toUpperCase()}*
+📍 ${shopAddress}
+📞 Phone: +91 ${shopPhone}
 
-👤 *Customer:* ${bill.customer_name}
-📅 *Date:* ${new Date(bill.created_at).toLocaleDateString()}
-📄 *Bill No:* ${bill.bill_number}
+👤 *Customer:* ${customerName}
+☀️ *Day:* ${billDay}
+📅 *Date:* ${billDate}
+📄 *Bill No:* ${billNo}
 
 *Purchased Items:*
 ${itemsSummary}
 
 ----------------------------------
-💰 *Total:* ₹${bill.total_amount}
-💵 *Paid:* ₹${bill.paid_amount}
-📌 *Balance:* ₹${bill.due_amount}
+💰 *Total:* ₹${totalAmt.toFixed(2)}
+💵 *Paid:* ₹${paidAmt.toFixed(2)}
+📌 *Balance:* ₹${dueAmt.toFixed(2)}
 💬 *Rupees in Words:* ${amountInWords}
 
-${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *₹${bill.due_amount}* at your convenience.` : '✅ Thank You! Visit Again.'}`;
+${dueAmt > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *₹${dueAmt.toFixed(2)}* at your earliest convenience.` : '✅ Thank You! Visit Again.'}
+
+- *Sent via NovaBill POS & Ledger* ⚡`;
 
     const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
   let badgeClass = 'badge-paid';
-  if (bill.payment_status === 'PARTIAL') badgeClass = 'badge-partial';
-  if (bill.payment_status === 'UNPAID') badgeClass = 'badge-unpaid';
-
-  const amountInWords = numberToWords(bill.total_amount);
-  const itemsList = bill.items || [];
-  // Fill minimum 5 rows for clean visual structure like paper bills
-  const emptyRowsCount = Math.max(0, 5 - itemsList.length);
+  if (paymentStatus === 'PARTIAL') badgeClass = 'badge-partial';
+  if (paymentStatus === 'UNPAID') badgeClass = 'badge-unpaid';
 
   return (
     <div className="modal-overlay">
@@ -113,7 +143,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
               🧾 Digital E-Bill Format
             </h3>
-            <span className={`badge ${badgeClass}`}>{bill.payment_status}</span>
+            <span className={`badge ${badgeClass}`}>{paymentStatus}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -140,7 +170,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
           ref={receiptRef}
           className="printable-bill-area"
           style={{
-            padding: '2.5rem',
+            padding: '2rem 2.5rem',
             background: '#ffffff',
             color: '#000000',
             fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
@@ -157,39 +187,49 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
               borderBottom: '2px solid #000000'
             }}>
               <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#000000', margin: 0, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                PATEL SUPER MARKET
+                {shopName}
               </h1>
-              <p style={{ fontSize: '0.95rem', fontWeight: 600, color: '#222222', margin: '0.3rem 0 0 0' }}>
-                Shop No. 4, Main Market Road, City
+              <p style={{ fontSize: '0.92rem', fontWeight: 600, color: '#222222', margin: '0.3rem 0 0 0' }}>
+                {shopAddress}
               </p>
-              <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#000000', margin: '0.2rem 0 0 0' }}>
-                Phone: +91 98765 43210
+              <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#000000', margin: '0.2rem 0 0 0' }}>
+                Phone: +91 {shopPhone}
               </p>
             </div>
 
-            {/* 2. Customer Name & Date Section */}
+            {/* 2. Customer Name, Date & Day Section */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '0.75rem 1rem',
               borderBottom: '2px solid #000000',
-              fontSize: '1.05rem',
-              fontWeight: 700
+              fontSize: '1.02rem',
+              fontWeight: 700,
+              gap: '0.75rem',
+              flexWrap: 'wrap'
             }}>
               <div>
                 <span>Customer Name: </span>
-                <span style={{ textDecoration: 'underline', fontWeight: 800 }}>{bill.customer_name}</span>
-                {bill.customer_phone && <span style={{ fontSize: '0.85rem', color: '#444', fontWeight: 600 }}> ({bill.customer_phone})</span>}
+                <span style={{ textDecoration: 'underline', fontWeight: 800 }}>{customerName}</span>
+                {customerPhone && <span style={{ fontSize: '0.85rem', color: '#444', fontWeight: 600 }}> ({customerPhone})</span>}
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <span>Date: </span>
-                <span style={{ textDecoration: 'underline', fontWeight: 800 }}>
-                  {new Date(bill.created_at).toLocaleDateString('en-GB')}
-                </span>
-                <div style={{ fontSize: '0.8rem', color: '#444', fontWeight: 600 }}>
-                  Bill No: {bill.bill_number}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <div>
+                  <span>Day: </span>
+                  <span style={{ textDecoration: 'underline', fontWeight: 800, color: '#1e1b4b' }}>
+                    {billDay}
+                  </span>
+                </div>
+                <div>
+                  <span>Date: </span>
+                  <span style={{ textDecoration: 'underline', fontWeight: 800 }}>
+                    {billDate}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#444', fontWeight: 700 }}>
+                  Bill No: {billNo}
                 </div>
               </div>
             </div>
@@ -209,10 +249,10 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                   <th style={{ padding: '0.6rem 0.75rem', borderRight: '2px solid #000000' }}>
                     Items
                   </th>
-                  <th style={{ width: '70px', padding: '0.6rem 0.5rem', borderRight: '2px solid #000000', textAlign: 'center' }}>
+                  <th style={{ width: '80px', padding: '0.6rem 0.5rem', borderRight: '2px solid #000000', textAlign: 'center' }}>
                     Qty
                   </th>
-                  <th style={{ width: '150px', padding: '0.6rem 0.75rem', textAlign: 'right' }}>
+                  <th style={{ width: '140px', padding: '0.6rem 0.75rem', textAlign: 'right' }}>
                     Amount Rs
                   </th>
                 </tr>
@@ -224,10 +264,10 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                       {idx + 1}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', borderRight: '2px solid #000000', fontWeight: 700 }}>
-                      {item.product_name}
+                      {item.name}
                     </td>
                     <td style={{ padding: '0.65rem 0.5rem', borderRight: '2px solid #000000', textAlign: 'center', fontWeight: 600 }}>
-                      {item.quantity}
+                      {item.quantity} {item.unit}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>
                       ₹{item.total.toFixed(2)}
@@ -265,7 +305,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                   fontWeight: 800
                 }}>
                   <span>Total</span>
-                  <span>₹{bill.total_amount.toFixed(2)}</span>
+                  <span>₹{totalAmt.toFixed(2)}</span>
                 </div>
 
                 {/* Paid Row */}
@@ -279,7 +319,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                   color: '#15803d'
                 }}>
                   <span>Paid</span>
-                  <span>₹{bill.paid_amount.toFixed(2)}</span>
+                  <span>₹{paidAmt.toFixed(2)}</span>
                 </div>
 
                 {/* Balance Row */}
@@ -289,30 +329,62 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                   padding: '0.55rem 0.75rem',
                   fontSize: '1.1rem',
                   fontWeight: 900,
-                  color: bill.due_amount > 0 ? '#b91c1c' : '#15803d',
-                  background: bill.due_amount > 0 ? '#fef2f2' : '#f0fdf4'
+                  color: dueAmt > 0 ? '#b91c1c' : '#15803d',
+                  background: dueAmt > 0 ? '#fef2f2' : '#f0fdf4'
                 }}>
                   <span>Balance</span>
-                  <span>₹{bill.due_amount.toFixed(2)}</span>
+                  <span>₹{dueAmt.toFixed(2)}</span>
                 </div>
 
               </div>
             </div>
 
-            {/* 5. Footer Section: Rupees in words | Thank You | Signature */}
+            {/* 5. UPI QR Code & Rupees in Words Section */}
             <div style={{
               borderTop: '2px solid #000000',
               padding: '1rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.85rem'
             }}>
               {/* Rupees in Words Line */}
-              <div style={{ fontSize: '1rem', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>
                 <span>Rupees in words: </span>
                 <span style={{ fontStyle: 'italic', fontWeight: 800, textDecoration: 'underline' }}>
                   {amountInWords}
                 </span>
+              </div>
+
+              {/* UPI Direct Scan Banner */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.5rem 0.75rem',
+                background: '#f8fafc',
+                border: '1px dashed #64748b',
+                borderRadius: '6px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>📱 Scan &amp; Pay via UPI (GPay / PhonePe / Paytm)</div>
+                  <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                    UPI ID: <strong>{savedShop.upiId || bill.upi_id || `${shopPhone}@upi`}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#16a34a' }}>Payable: ₹{(dueAmt > 0 ? dueAmt : totalAmt).toFixed(2)}</div>
+                </div>
+                {(savedShop.upiQrImage || bill.upi_qr_image) ? (
+                  <img
+                    src={savedShop.upiQrImage || bill.upi_qr_image}
+                    alt="Custom Standee QR"
+                    style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #94a3b8' }}
+                  />
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=upi://pay?pa=${encodeURIComponent(savedShop.upiId || bill.upi_id || `${shopPhone}@upi`)}%26pn=${encodeURIComponent(shopName)}%26am=${(dueAmt > 0 ? dueAmt : totalAmt).toFixed(2)}%26cu=INR`}
+                    alt="UPI QR Code"
+                    style={{ width: '60px', height: '60px', borderRadius: '4px' }}
+                  />
+                )}
               </div>
 
               {/* Thank You & Signature Row */}
@@ -324,7 +396,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                 paddingTop: '0.5rem'
               }}>
                 <div style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: 'cursive, sans-serif' }}>
-                  Thank You
+                  Thank You! Visit Again 🙏
                 </div>
 
                 <div style={{ textAlign: 'center', minWidth: '160px' }}>
@@ -339,43 +411,31 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                       )
                     ) : null}
                   </div>
-                  <div style={{ borderBottom: '1.5px solid #000000', marginBottom: '0.2rem', width: '100%' }}></div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <div style={{ borderTop: '1.5px solid #000000', width: '100%', marginTop: '4px' }}></div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', marginTop: '2px' }}>
                     Authorized Signatory
                   </div>
-                  {shopSignature && (
-                    <div style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                      ✓ Digitally Verified
-                    </div>
-                  )}
                 </div>
               </div>
-
             </div>
 
           </div>
-          {/* End of Outer Box Frame */}
-
         </div>
 
-        {/* Settle Payment Action Footer (No Print) */}
-        {bill.due_amount > 0 && (
+        {/* Bottom Settle Action (If unpaid & opened via Khata) */}
+        {dueAmt > 0 && onOpenSettleModal && (
           <div className="no-print" style={{
             padding: '1rem 1.5rem',
-            background: 'rgba(239, 68, 68, 0.12)',
-            borderTop: '1px solid rgba(239, 68, 68, 0.3)',
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderTop: '1px solid var(--border-color)',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'flex-end'
           }}>
-            <div style={{ color: '#f87171', fontSize: '0.9rem', fontWeight: 700 }}>
-              ⚠️ Customer owes remaining balance of ₹{bill.due_amount}
-            </div>
             <button 
               className="btn btn-primary"
               onClick={() => { onClose(); onOpenSettleModal(bill); }}
             >
-              💵 Collect / Settle Balance
+              💰 Settle Pending Balance (₹{dueAmt.toFixed(2)})
             </button>
           </div>
         )}

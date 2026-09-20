@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import BillAnimationModal from './components/BillAnimationModal';
+import AuthPage from './components/AuthPage';
+import { LogOut } from 'lucide-react';
 
 // ─── Constants & Default Data ────────────────────────────────────────────────
 const UNITS = ['pcs', 'kg', 'g', 'grams', 'L', 'mL', 'box', 'pack', 'dozen', 'pairs', 'set', 'bundle'];
@@ -18,9 +20,11 @@ const PRODUCT_CATEGORIES = [
 ];
 
 const DEFAULT_SHOP = {
-  name: 'My Store',
+  name: 'NovaBill Store',
   address: '123 Market Street, Main Road, City',
   phone: '9876543210',
+  upiId: '',
+  upiQrImage: '',
   signature: ''
 };
 
@@ -72,13 +76,60 @@ const getBillPaid = bill =>
   bill.payments?.length ? bill.payments.reduce((s, p) => s + (p.amount || 0), 0) : (bill.paid || 0);
 const getBillBalance = bill => Math.max(0, bill.total - getBillPaid(bill));
 
+const normalizeProduct = p => ({
+  id: p.id,
+  name: p.name || '',
+  category: p.category || 'Grocery',
+  rate: parseFloat(p.rate !== undefined ? p.rate : (p.price || 0)),
+  unit: p.unit || 'pcs',
+  stock: parseFloat(p.stock !== undefined ? p.stock : 0)
+});
+
+const normalizeCustomer = c => ({
+  id: c.id,
+  name: c.name || 'Customer',
+  phone: c.phone || '',
+  address: c.address || '',
+  total_due: parseFloat(c.total_due || 0)
+});
+
 const normalizeBill = bill => {
-  if (bill.payments) return bill;
+  const billNo = bill.billNo || bill.bill_number || `BILL-${bill.id || '1001'}`;
+  const customer = bill.customer || bill.customer_name || 'Walk-in Customer';
+  const phone = bill.phone || bill.customer_phone || '';
+  const total = parseFloat(bill.total !== undefined ? bill.total : (bill.total_amount || 0));
+  const paid = parseFloat(bill.paid !== undefined ? bill.paid : (bill.paid_amount || 0));
+  const balance = parseFloat(bill.balance !== undefined ? bill.balance : (bill.due_amount !== undefined ? bill.due_amount : Math.max(0, total - paid)));
+  const date = bill.date || (bill.created_at ? String(bill.created_at).slice(0, 10) : todayStr());
+  const dateObj = new Date(date + (String(date).length === 10 ? 'T00:00:00' : ''));
+  const day = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const items = (bill.items || []).map(it => ({
+    name: it.name || it.product_name || '',
+    qty: String(it.qty !== undefined ? it.qty : (it.quantity !== undefined ? it.quantity : 1)),
+    rate: String(it.rate !== undefined ? it.rate : (it.price !== undefined ? it.price : 0)),
+    unit: it.unit || 'pcs'
+  }));
+  const payments = bill.payments || (paid > 0 ? [{ id: uid(), amount: paid, type: bill.payment_mode || 'paid', date, note: '' }] : []);
+
   return {
     ...bill,
-    payments: (bill.paid || 0) > 0
-      ? [{ id: uid(), amount: bill.paid, type: bill.paymentType || 'paid', date: bill.date, note: '' }]
-      : [],
+    id: bill.id,
+    billNo,
+    bill_number: billNo,
+    customer,
+    customer_name: customer,
+    phone,
+    customer_phone: phone,
+    total,
+    total_amount: total,
+    paid,
+    paid_amount: paid,
+    balance,
+    due_amount: balance,
+    date,
+    day,
+    items,
+    payments
   };
 };
 
@@ -172,7 +223,7 @@ async function downloadBillImage(bill) {
 function sendWhatsAppReminder(bill, shop) {
   const phone = bill.phone ? bill.phone.replace(/\D/g, '') : '';
   const balance = getBillBalance(bill);
-  const msg = `🙏 *Payment Reminder from ${shop.name}*\n\nDear *${bill.customer}*,\nThis is a gentle reminder that an outstanding balance of *${fmt(balance)}* is pending for bill *${bill.billNo}* dated ${bill.date}.\n\nKindly clear the balance at your earliest convenience via Cash or UPI.\n\nThank you for your business! ✨`;
+  const msg = `🙏 *Payment Reminder from ${shop.name}*\n\nDear *${bill.customer}*,\nThis is a gentle reminder that an outstanding balance of *${fmt(balance)}* is pending for bill *${bill.billNo}* dated ${bill.date}.\n\nKindly clear the balance at your earliest convenience via Cash or UPI.\n\nThank You! Visit Again ✨`;
   window.open(phone ? `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -454,46 +505,65 @@ function SignaturePad({ onSave }) {
             />
           </div>
 
-          {/* Calligraphy Font Choices */}
-          <div style={{ marginTop: '0.4rem' }}>
-            <span className="sig-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-              Choose Calligraphy Style:
-            </span>
-            <div className="font-selector-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
-              {CURSIVE_FONTS.map(f => (
-                <button
-                  key={f.name}
-                  type="button"
-                  className={`font-chip ${selectedFont === f.family ? 'active' : ''}`}
-                  onClick={() => setSelectedFont(f.family)}
-                >
-                  <span className="font-chip-label">{f.label}</span>
-                  <span className="font-chip-preview" style={{ fontFamily: f.family, color: inkColor, fontSize: '1.45rem' }}>
-                    {typedSig || f.name}
-                  </span>
-                </button>
-              ))}
+          {/* Calligraphy Font Choices with Dropdown & Visual Chips */}
+          <div style={{ marginTop: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span className="sig-label" style={{ fontWeight: 700 }}>
+                📜 Choose Calligraphy Style (Dropdown):
+              </span>
             </div>
+
+            <select
+              className="dark-input font-select-dropdown"
+              value={selectedFont}
+              onChange={e => setSelectedFont(e.target.value)}
+              style={{
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                padding: '0.65rem 0.85rem',
+                width: '100%',
+                background: 'var(--surface2, #1e293b)',
+                color: 'var(--text, #fff)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              {CURSIVE_FONTS.map(f => (
+                <option key={f.name} value={f.family}>
+                  {f.label} — ({f.name})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Flourish & Swoosh Selector (Matching the photo) */}
-          <div style={{ marginTop: '0.4rem' }}>
-            <span className="sig-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-              Flourish &amp; Loop Pattern:
+          {/* Flourish & Swoosh Selector Dropdown */}
+          <div style={{ marginTop: '0.6rem' }}>
+            <span className="sig-label" style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 700 }}>
+              〰️ Choose Flourish &amp; Underline Style (Dropdown):
             </span>
-            <div className="flourish-options-grid">
+            <select
+              className="dark-input"
+              value={flourish}
+              onChange={e => setFlourish(e.target.value)}
+              style={{
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                padding: '0.65rem 0.85rem',
+                width: '100%',
+                background: 'var(--surface2, #1e293b)',
+                color: 'var(--text, #fff)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
               {FLOURISH_STYLES.map(fl => (
-                <button
-                  key={fl.id}
-                  type="button"
-                  className={`flourish-pill-btn ${flourish === fl.id ? 'active' : ''}`}
-                  onClick={() => setFlourish(fl.id)}
-                >
-                  <span style={{ fontWeight: 700 }}>{fl.label}</span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', display: 'block' }}>{fl.desc}</span>
-                </button>
+                <option key={fl.id} value={fl.id}>
+                  {fl.label} ({fl.desc})
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Live Preview Card */}
@@ -849,6 +919,10 @@ function ReceiptView({ bill, shop, onSend, onSendImage, onSaveImage, onBack, gen
             <strong className="rcp-value">{bill.billNo}</strong>
           </div>
           <div className="rcp-meta-row">
+            <span className="rcp-label">Day</span>
+            <strong className="rcp-value">{bill.day || (bill.date ? new Date(bill.date + (String(bill.date).length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-US', { weekday: 'long' }) : '')}</strong>
+          </div>
+          <div className="rcp-meta-row">
             <span className="rcp-label">Date</span>
             <strong className="rcp-value">{bill.date}</strong>
           </div>
@@ -876,7 +950,7 @@ function ReceiptView({ bill, shop, onSend, onSendImage, onSaveImage, onBack, gen
               <tr key={i}>
                 <td style={{ textAlign: 'center' }}>{i + 1}</td>
                 <td style={{ textAlign: 'left', fontWeight: 500 }}>{item.name}</td>
-                <td style={{ textAlign: 'center' }}>{item.qty} {item.unit}</td>
+                <td style={{ textAlign: 'center' }}>{item.qty} {item.unit || 'pcs'}</td>
                 <td style={{ textAlign: 'right', fontWeight: 600 }}>{((parseFloat(item.qty) || 0) * (parseFloat(item.rate) || 0)).toFixed(2)}</td>
               </tr>
             ))}
@@ -914,9 +988,47 @@ function ReceiptView({ bill, shop, onSend, onSendImage, onSaveImage, onBack, gen
             ? <em>Balance: {numberToWords(balance)}</em>
             : <em>Amount: {numberToWords(bill.total)}</em>}
         </div>
+
+        {/* Dynamic UPI Payment QR Code */}
+        {(balance > 0 || bill.total > 0) && (
+          <div className="rcp-upi-section" style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.65rem 0.85rem',
+            background: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px dashed #cbd5e1',
+            margin: '0.6rem 0'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>📱 Scan &amp; Pay via UPI (GPay / PhonePe / Paytm)</div>
+              <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                UPI ID: <strong>{shop.upiId || `${shop.phone || '9876543210'}@upi`}</strong>
+              </div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#16a34a', marginTop: '2px' }}>
+                Payable: {fmt(balance > 0 ? balance : bill.total)}
+              </div>
+            </div>
+            {shop.upiQrImage ? (
+              <img
+                src={shop.upiQrImage}
+                alt="Shop UPI Standee QR"
+                style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+              />
+            ) : (
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=upi://pay?pa=${encodeURIComponent(shop.upiId || `${shop.phone || '9876543210'}@upi`)}%26pn=${encodeURIComponent(shop.name)}%26am=${(balance > 0 ? balance : bill.total).toFixed(2)}%26cu=INR`}
+                alt="UPI QR Code"
+                style={{ width: '56px', height: '56px', borderRadius: '4px' }}
+              />
+            )}
+          </div>
+        )}
+
         <div className="rcp-divider" />
         <div className="rcp-footer">
-          <div className="rcp-thankyou">Thank You 🙏</div>
+          <div className="rcp-thankyou">Thank You! Visit Again 🙏</div>
           <div className="rcp-signature-block">
             <div className="rcp-sig-wrapper">
               {shop.signature && (
@@ -1234,7 +1346,7 @@ function ProductsPage({ products, setProducts, onQuickAddProductToBill }) {
     setShowModal(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.rate) return;
 
@@ -1242,21 +1354,45 @@ function ProductsPage({ products, setProducts, onQuickAddProductToBill }) {
       name: form.name.trim(),
       category: form.category,
       rate: parseFloat(form.rate),
+      price: parseFloat(form.rate),
       unit: form.unit,
       stock: parseFloat(form.stock) || 0
     };
 
     if (editId) {
+      try {
+        await fetch(`/api/products/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {}
       setProducts(prev => prev.map(p => p.id === editId ? { ...p, ...payload } : p));
     } else {
-      setProducts(prev => [{ id: uid(), ...payload }, ...prev]);
+      let saved = null;
+      try {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          saved = normalizeProduct(data);
+        }
+      } catch (err) {}
+      if (!saved) saved = { id: uid(), ...payload };
+      setProducts(prev => [saved, ...prev]);
     }
 
     setShowModal(false);
   };
 
-  const deleteProduct = (id) => {
+  const deleteProduct = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      } catch (err) {}
       setProducts(prev => prev.filter(p => p.id !== id));
     }
   };
@@ -1443,18 +1579,33 @@ function CustomersPage({ customers, setCustomers, bills, onQuickBillFromContact,
     (c.phone && c.phone.includes(search))
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) return;
+    const cleanPhone = form.phone.replace(/\D/g, '');
+    const payload = {
+      name: form.name.trim(),
+      phone: cleanPhone,
+      address: form.address.trim()
+    };
+
     if (editId) {
-      setCustomers(prev => prev.map(c => c.id === editId ? { ...c, ...form, phone: form.phone.replace(/\D/g, '') } : c));
+      setCustomers(prev => prev.map(c => c.id === editId ? { ...c, ...payload } : c));
       setEditId(null);
     } else {
-      setCustomers(prev => [{
-        id: uid(),
-        name: form.name.trim(),
-        phone: form.phone.replace(/\D/g, ''),
-        address: form.address.trim()
-      }, ...prev]);
+      let newCust = null;
+      try {
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          newCust = normalizeCustomer(data);
+        }
+      } catch (e) {}
+      if (!newCust) newCust = { id: uid(), ...payload, total_due: 0 };
+      setCustomers(prev => [newCust, ...prev]);
     }
     setForm({ name: '', phone: '', address: '' });
   };
@@ -1536,6 +1687,16 @@ function CustomersPage({ customers, setCustomers, bills, onQuickBillFromContact,
 
 // ─── MAIN APPLICATION COMPONENT ──────────────────────────────────────────────
 export default function App() {
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('novabill_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
   // Theme state
   const [darkMode, setDarkMode] = useState(() => {
     const s = localStorage.getItem('theme');
@@ -1550,7 +1711,16 @@ export default function App() {
   // Core data states
   // DEFAULT TAB is now 'home' (Home Operations Hub)
   const [tab, setTab] = useState('home');
-  const [shop, setShop] = useState(() => JSON.parse(localStorage.getItem('shopSettings') || JSON.stringify(DEFAULT_SHOP)));
+  const [shop, setShop] = useState(() => {
+    const saved = localStorage.getItem('shopSettings');
+    if (saved) return JSON.parse(saved);
+    const userSaved = localStorage.getItem('novabill_user');
+    if (userSaved) {
+      const u = JSON.parse(userSaved);
+      return { ...DEFAULT_SHOP, name: u.store_name || DEFAULT_SHOP.name, phone: u.phone || DEFAULT_SHOP.phone };
+    }
+    return DEFAULT_SHOP;
+  });
   const [bills, setBills] = useState(() => (JSON.parse(localStorage.getItem('bills') || '[]')).map(normalizeBill));
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('products');
@@ -1589,6 +1759,46 @@ export default function App() {
   useEffect(() => { localStorage.setItem('products', JSON.stringify(products)); }, [products]);
   useEffect(() => { localStorage.setItem('customers', JSON.stringify(customers)); }, [customers]);
   useEffect(() => { localStorage.setItem('shopSettings', JSON.stringify(shop)); }, [shop]);
+
+  // Live Sync with Backend MySQL Database
+  useEffect(() => {
+    const loadBackendData = async () => {
+      try {
+        const [pRes, cRes, bRes] = await Promise.all([
+          fetch('/api/products').catch(() => null),
+          fetch('/api/customers').catch(() => null),
+          fetch('/api/bills').catch(() => null)
+        ]);
+
+        if (pRes && pRes.ok) {
+          const pData = await pRes.json();
+          if (Array.isArray(pData) && pData.length > 0) {
+            setProducts(pData.map(normalizeProduct));
+          }
+        }
+
+        if (cRes && cRes.ok) {
+          const cData = await cRes.json();
+          if (Array.isArray(cData) && cData.length > 0) {
+            setCustomers(cData.map(normalizeCustomer));
+          }
+        }
+
+        if (bRes && bRes.ok) {
+          const bData = await bRes.json();
+          if (Array.isArray(bData) && bData.length > 0) {
+            setBills(bData.map(normalizeBill));
+          }
+        }
+      } catch (err) {
+        console.warn('Backend live sync warning:', err);
+      }
+    };
+
+    if (currentUser) {
+      loadBackendData();
+    }
+  }, [currentUser]);
 
   // Computed Values
   const total = items.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.rate) || 0), 0);
@@ -1655,7 +1865,13 @@ export default function App() {
           setCustPhone(tel);
           // Also persist into customers if not present
           if (tel && !customers.find(c => c.phone === tel)) {
-            setCustomers(prev => [{ id: uid(), name, phone: tel }, ...prev]);
+            const newC = { id: uid(), name, phone: tel, address: '' };
+            setCustomers(prev => [newC, ...prev]);
+            fetch('/api/customers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newC)
+            }).catch(() => {});
           }
           return;
         }
@@ -1677,6 +1893,11 @@ export default function App() {
 
   const handleAddNewContact = (newC) => {
     setCustomers(prev => [newC, ...prev]);
+    fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newC)
+    }).catch(() => {});
   };
 
   // Quick Bill for specific customer
@@ -1688,35 +1909,78 @@ export default function App() {
     setViewBill(null);
   };
 
-  // Generate Bill
-  const handleGenerate = () => {
+  // Generate Bill (Persist to MySQL API)
+  const handleGenerate = async () => {
     if (!customer.trim() || validItems.length === 0) return;
     const initialPayments = paidAmt > 0
       ? [{ id: uid(), amount: paidAmt, type: paymentType, date, note: '' }]
       : [];
-    const newBill = {
-      id: Date.now(),
-      billNo: nextBillNo(bills),
-      customer: customer.trim(),
-      phone: custPhone.trim(),
-      date,
-      items: validItems,
-      total,
-      payments: initialPayments,
-      paid: paidAmt,
-      paymentType,
-      balance,
-      remarks: remarks.trim(),
-      createdAt: new Date().toISOString(),
+
+    const billPayload = {
+      customer_name: customer.trim(),
+      customer_phone: custPhone.trim(),
+      total_amount: total,
+      paid_amount: paidAmt,
+      due_amount: balance,
+      payment_mode: paymentType === 'paid' ? 'Cash' : 'Credit/Udhar',
+      notes: remarks.trim(),
+      items: validItems.map(it => ({
+        product_name: it.name,
+        price: parseFloat(it.rate),
+        quantity: parseFloat(it.qty),
+        unit: it.unit || 'pcs'
+      }))
     };
 
-    // Auto-save new customer
-    if (custPhone.trim() && !customers.find(c => c.phone === custPhone.trim())) {
-      setCustomers(prev => [{ id: uid(), name: customer.trim(), phone: custPhone.trim() }, ...prev]);
+    let savedBill = null;
+    try {
+      const res = await fetch('/api/bills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(billPayload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        savedBill = normalizeBill(data);
+      }
+    } catch (err) {
+      console.warn('API bill create error, falling back locally:', err);
     }
 
-    setBills(prev => [newBill, ...prev]);
-    setViewBill(newBill); // Open bill receipt view directly in the previous format
+    if (!savedBill) {
+      const dateObj = new Date(date + (String(date).length === 10 ? 'T00:00:00' : ''));
+      const day = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('en-US', { weekday: 'long' }) : new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      savedBill = {
+        id: Date.now(),
+        billNo: nextBillNo(bills),
+        customer: customer.trim(),
+        phone: custPhone.trim(),
+        date,
+        day,
+        items: validItems.map(it => ({ ...it, unit: it.unit || 'pcs' })),
+        total,
+        payments: initialPayments,
+        paid: paidAmt,
+        paymentType,
+        balance,
+        remarks: remarks.trim(),
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    // Auto-save new customer to MySQL
+    if (custPhone.trim() && !customers.find(c => c.phone === custPhone.trim())) {
+      const newCust = { id: uid(), name: customer.trim(), phone: custPhone.trim(), address: '' };
+      setCustomers(prev => [newCust, ...prev]);
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCust)
+      }).catch(() => {});
+    }
+
+    setBills(prev => [savedBill, ...prev.filter(b => b.id !== savedBill.id)]);
+    setViewBill(savedBill); // Open bill receipt view directly
   };
 
   const handleCloseAnimation = () => {
@@ -1726,11 +1990,30 @@ export default function App() {
     }
   };
 
-  const handleViewBill = (bill) => {
-    setViewBill(bill);
+  const handleViewBill = (billOrId) => {
+    if (typeof billOrId === 'object' && billOrId !== null) {
+      setViewBill(normalizeBill(billOrId));
+    } else {
+      const found = bills.find(b => String(b.id) === String(billOrId));
+      if (found) setViewBill(normalizeBill(found));
+    }
   };
 
-  const handleAddPayment = (bill, payment) => {
+  const handleAddPayment = async (bill, payment) => {
+    try {
+      await fetch(`/api/bills/${bill.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: payment.amount,
+          payment_mode: payment.type || payment.payment_mode || 'Cash',
+          notes: payment.note || ''
+        })
+      });
+    } catch (e) {
+      console.warn('Record payment API error:', e);
+    }
+
     setBills(prev => prev.map(b => {
       if (b.id !== bill.id) return b;
       const newPayments = [...(b.payments || []), payment];
@@ -1798,6 +2081,32 @@ export default function App() {
     setTimeout(() => setShopSaved(false), 2500);
   };
 
+  const handleLoginSuccess = (user, token, remember) => {
+    setCurrentUser(user);
+    if (remember) {
+      localStorage.setItem('novabill_user', JSON.stringify(user));
+      if (token) localStorage.setItem('novabill_token', token);
+    }
+    if (user?.store_name) {
+      const updated = {
+        ...shop,
+        name: user.store_name,
+        phone: user.phone || shop.phone
+      };
+      setShop(updated);
+      setShopEdit(updated);
+      localStorage.setItem('shopSettings', JSON.stringify(updated));
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to log out of NovaBill?')) {
+      setCurrentUser(null);
+      localStorage.removeItem('novabill_user');
+      localStorage.removeItem('novabill_token');
+    }
+  };
+
   const saveSignature = (sig) => {
     const updated = { ...shopEdit, signature: sig };
     setShopEdit(updated);
@@ -1818,6 +2127,17 @@ export default function App() {
     setPaymentTarget(null);
   };
 
+  // If vendor is not logged in, show NovaBill Vendor Login/Register Portal
+  if (!currentUser) {
+    return (
+      <AuthPage
+        onLoginSuccess={handleLoginSuccess}
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+      />
+    );
+  }
+
   const NAV_ITEMS = [
     { id: 'home', icon: '⚡', label: 'Home Hub' },
     { id: 'new-bill', icon: '🧾', label: 'Create Bill' },
@@ -1833,10 +2153,10 @@ export default function App() {
       {/* ── Desktop Sidebar ── */}
       <aside className="sidebar no-print">
         <div className="logo" onClick={() => navTo('home')} style={{ cursor: 'pointer' }}>
-          <span className="logo-icon">🧾</span>
+          <span className="logo-icon">⚡</span>
           <div className="logo-texts">
-            <span className="logo-text">E-Bill Pro</span>
-            <span className="logo-subtitle">POS &amp; Khata Manager</span>
+            <span className="logo-text">NovaBill</span>
+            <span className="logo-subtitle">Next-Gen POS &amp; Khata</span>
           </div>
         </div>
         <nav className="nav">
@@ -1854,11 +2174,26 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {/* Vendor Profile & Logout */}
+          <div className="vendor-session-card">
+            <div className="vendor-session-info">
+              <div className="vendor-avatar">
+                {(currentUser.store_name || 'N').charAt(0).toUpperCase()}
+              </div>
+              <div className="vendor-names">
+                <span className="vendor-store-title">{currentUser.store_name || shop.name}</span>
+                <span className="vendor-role-tag">@{currentUser.username || 'vendor'}</span>
+              </div>
+            </div>
+            <button className="btn-logout" onClick={handleLogout} title="Logout">
+              <LogOut size={13} />
+            </button>
+          </div>
+
           <button id="theme-toggle" className="theme-toggle" onClick={() => setDarkMode(d => !d)}>
             <span>{darkMode ? '☀️' : '🌙'}</span>
             <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
-          <div className="sidebar-shop">🏪 {shop.name}</div>
         </div>
       </aside>
 
@@ -1867,8 +2202,8 @@ export default function App() {
         {/* Mobile Top Header */}
         <div className="topbar no-print">
           <div className="topbar-title" onClick={() => navTo('home')} style={{ cursor: 'pointer' }}>
-            <span className="topbar-logo">🧾</span>
-            <span>{shop.name || 'E-Bill Pro'}</span>
+            <span className="topbar-logo">⚡</span>
+            <span>{shop.name || 'NovaBill'}</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button className="topbar-quick-btn" onClick={handlePickPhoneContact} title="Pick Phone Contact">
@@ -1876,6 +2211,9 @@ export default function App() {
             </button>
             <button id="theme-toggle-mobile" className="theme-toggle-mobile" onClick={() => setDarkMode(d => !d)}>
               {darkMode ? '☀️' : '🌙'}
+            </button>
+            <button className="btn-logout" onClick={handleLogout} title="Logout" style={{ padding: '0.4rem 0.6rem' }}>
+              <LogOut size={14} />
             </button>
           </div>
         </div>
@@ -1985,7 +2323,22 @@ export default function App() {
                 </div>
 
                 <div className="field-group">
-                  <label htmlFor="f-date">Bill Date</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label htmlFor="f-date">Bill Date &amp; Day</label>
+                    {date && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: '#6366f1',
+                        background: 'rgba(99, 102, 241, 0.12)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(99, 102, 241, 0.25)'
+                      }}>
+                        ☀️ {new Date(date + (date.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-US', { weekday: 'long' })}
+                      </span>
+                    )}
+                  </div>
                   <input id="f-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
                 </div>
               </div>
@@ -2153,7 +2506,7 @@ export default function App() {
 
               {/* Footer with Digital Signature */}
               <div className="bp-footer-text">
-                <span>Thank You for your business! 🙏</span>
+                <span>Thank You! Visit Again 🙏</span>
                 <div className="rcp-signature-block" style={{ marginTop: '0.5rem' }}>
                   <div className="rcp-sig-wrapper">
                     {shop.signature && (
@@ -2346,6 +2699,61 @@ export default function App() {
                     value={shopEdit.phone}
                     onChange={e => setShopEdit(s => ({ ...s, phone: e.target.value }))}
                   />
+                </div>
+
+                {/* ── UPI & Digital Payments (QR Code Configuration) ── */}
+                <div style={{ margin: '1.25rem 0', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                    📱 UPI &amp; Digital Payments (QR Code)
+                  </h4>
+
+                  <div className="field-group">
+                    <label htmlFor="s-upi">Store UPI ID / VPA</label>
+                    <input
+                      id="s-upi"
+                      placeholder="e.g. 9876543210@upi, mybusiness@okhdfcbank"
+                      value={shopEdit.upiId || ''}
+                      onChange={e => setShopEdit(s => ({ ...s, upiId: e.target.value.trim() }))}
+                    />
+                    <small style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Used to auto-generate dynamic payment QR codes with exact bill amounts on receipts.
+                    </small>
+                  </div>
+
+                  <div className="field-group" style={{ marginTop: '0.6rem' }}>
+                    <label>Upload Custom QR Standee Image (Optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            setShopEdit(s => ({ ...s, upiQrImage: ev.target.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                    {shopEdit.upiQrImage && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', padding: '0.5rem', background: 'var(--surface2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <img src={shopEdit.upiQrImage} alt="Custom Standee QR" style={{ width: '56px', height: '56px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', display: 'block' }}>✓ Custom QR Active</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Will appear on all customer receipts</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-delete-small"
+                          onClick={() => setShopEdit(s => ({ ...s, upiQrImage: '' }))}
+                        >
+                          🗑 Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <button id="save-settings-btn" className="btn-primary" onClick={saveSettings} style={{ width: '100%', marginTop: '0.75rem' }}>

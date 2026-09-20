@@ -11,6 +11,48 @@ app.use(express.json());
 
 // API ROUTES
 
+// Auth (Vendor Login & Register)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+    const user = await dbApi.authenticateUser(username, password);
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user,
+      token: `novabill-token-${user.id}-${Date.now()}`
+    });
+  } catch (err) {
+    res.status(401).json({ error: err.message || 'Invalid credentials' });
+  }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const newUser = await dbApi.registerUser(req.body);
+    res.status(201).json({
+      success: true,
+      message: 'Vendor account registered successfully',
+      user: newUser,
+      token: `novabill-token-${newUser.id}-${Date.now()}`
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Registration failed' });
+  }
+});
+
+app.get('/api/auth/me/:id', async (req, res) => {
+  try {
+    const user = await dbApi.getUserById(req.params.id);
+    res.json(user);
+  } catch (err) {
+    res.status(404).json({ error: 'User not found' });
+  }
+});
+
 // Products
 app.get('/api/products', async (req, res) => {
   try {

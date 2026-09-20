@@ -5,7 +5,18 @@ const BillsList = ({ bills, onViewBill, onOpenSettleModal }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const filteredBills = bills.filter(bill => {
+  const filteredBills = bills.map(b => ({
+    id: b.id,
+    bill_number: b.bill_number || b.billNo || `BILL-${b.id}`,
+    customer_name: b.customer_name || b.customer || 'Walk-in Customer',
+    customer_phone: b.customer_phone || b.phone || '',
+    total_amount: parseFloat(b.total_amount !== undefined ? b.total_amount : (b.total || 0)),
+    paid_amount: parseFloat(b.paid_amount !== undefined ? b.paid_amount : (b.paid || 0)),
+    due_amount: parseFloat(b.due_amount !== undefined ? b.due_amount : (b.balance !== undefined ? b.balance : 0)),
+    payment_status: b.payment_status || (parseFloat(b.due_amount || b.balance || 0) <= 0 ? 'PAID' : (parseFloat(b.paid_amount || b.paid || 0) > 0 ? 'PARTIAL' : 'UNPAID')),
+    payment_mode: b.payment_mode || 'Cash',
+    created_at: b.created_at || b.date || new Date().toISOString()
+  })).filter(bill => {
     const matchesSearch = 
       bill.bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       bill.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -21,20 +32,26 @@ const BillsList = ({ bills, onViewBill, onOpenSettleModal }) => {
     let phone = bill.customer_phone ? bill.customer_phone.replace(/\D/g, '') : '';
     if (phone.length === 10) phone = '91' + phone;
 
-    const message = `🧾 *E-BILL RECEIPT* - Patel Super Market
+    const dateObj = bill.created_at ? new Date(bill.created_at) : new Date();
+    const isValid = !isNaN(dateObj.getTime());
+    const dateStr = isValid ? dateObj.toLocaleDateString('en-GB') : '';
+    const dayStr = isValid ? dateObj.toLocaleDateString('en-US', { weekday: 'long' }) : '';
+
+    const message = `🧾 *E-BILL RECEIPT* - NovaBill Super Store
 ----------------------------------
 📄 *Invoice #:* ${bill.bill_number}
 👤 *Customer:* ${bill.customer_name}
-📅 *Date:* ${new Date(bill.created_at).toLocaleDateString()}
+☀️ *Day:* ${dayStr}
+📅 *Date:* ${dateStr}
 
-💰 *Total Amount:* ₹${bill.total_amount}
-💵 *Amount Paid:* ₹${bill.paid_amount}
-📌 *REMAINING BALANCE DUE:* ₹${bill.due_amount}
+💰 *Total Amount:* ₹${bill.total_amount.toFixed(2)}
+💵 *Amount Paid:* ₹${bill.paid_amount.toFixed(2)}
+📌 *REMAINING BALANCE DUE:* ₹${bill.due_amount.toFixed(2)}
 💳 *Status:* ${bill.payment_status} (${bill.payment_mode})
 
-${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *₹${bill.due_amount}* at your earliest convenience.` : '✅ Thank you for your payment!'}
+${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *₹${bill.due_amount.toFixed(2)}* at your earliest convenience.` : '✅ Thank you for your payment!'}
 
-- *Sent via E-Bill Store System* 🏪`;
+- *Sent via NovaBill POS & Ledger* ⚡`;
 
     const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -132,8 +149,13 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                   return (
                     <tr key={bill.id}>
                       <td style={{ fontWeight: 800, color: '#6366f1' }}>{bill.bill_number}</td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {new Date(bill.created_at).toLocaleDateString()}
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text, #fff)' }}>
+                          {new Date(bill.created_at).toLocaleDateString('en-GB')}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#818cf8', fontWeight: 600 }}>
+                          {new Date(bill.created_at).toLocaleDateString('en-US', { weekday: 'short' })}
+                        </div>
                       </td>
                       <td>
                         <span style={{ fontWeight: 700, color: '#fff', display: 'block' }}>{bill.customer_name}</span>
@@ -158,7 +180,7 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the remaining balance of *�
                         <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
                           <button 
                             className="btn btn-secondary btn-sm"
-                            onClick={() => onViewBill(bill.id)}
+                            onClick={() => onViewBill(bill)}
                             title="View E-Bill Receipt"
                           >
                             <Eye size={14} /> Receipt

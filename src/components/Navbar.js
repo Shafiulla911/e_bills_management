@@ -16,7 +16,7 @@ const Navbar = ({ onNewBillClick, stats }) => {
       {/* Title / Search */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-          E-Billing & Udhar Ledger
+          NovaBill POS &amp; Ledger
         </h2>
         <div style={{
           display: 'flex',

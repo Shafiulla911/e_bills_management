@@ -10,14 +10,14 @@ const Dashboard = ({ stats, bills, customers, onNavigate, onViewBill, onOpenSett
 ----------------------------------
 Dear *${customerName}*,
 
-This is a gentle reminder regarding your pending balance of *₹${amountOwed}* at *Patel Super Market*.
+This is a gentle reminder regarding your pending balance of *₹${amountOwed}* at *NovaBill Super Store*.
 
 Kindly clear the balance amount at your earliest convenience via UPI / Cash.
 
 If you have already paid, please ignore this message.
 
 Thank you!
-*Patel Super Market* 🏪`;
+*NovaBill Super Store* 🏪`;
 
     const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');

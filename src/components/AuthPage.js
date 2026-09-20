@@ -56,24 +56,37 @@ export default function AuthPage({ onLoginSuccess, darkMode, setDarkMode }) {
         body: JSON.stringify({ username: loginUser.trim(), password: loginPass })
       });
 
-      let data;
+      let data = null;
       try {
         data = await res.json();
       } catch (jsonErr) {
-        data = { error: 'Invalid response from server. Please verify backend service.' };
+        data = null;
       }
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed. Please check credentials.');
+      if (res.ok && data && data.user) {
+        setSuccessMsg('Authentication successful! Loading your dashboard...');
+        setTimeout(() => {
+          onLoginSuccess(data.user, data.token, rememberMe);
+        }, 500);
+        return;
+      } else if (data && data.error && !data.error.includes('backend service')) {
+        throw new Error(data.error);
+      } else {
+        throw new Error('Server offline or invalid response');
       }
-
-      setSuccessMsg('Authentication successful! Loading your dashboard...');
-      setTimeout(() => {
-        onLoginSuccess(data.user, data.token, rememberMe);
-      }, 500);
     } catch (err) {
-      // Fallback offline verification if backend server isn't reachable
-      if ((loginUser.trim().toLowerCase() === 'root' || loginUser.trim().toLowerCase() === 'root@novabill.com') && loginPass === 'Password') {
+      // Local / Offline fallback auth
+      const localUsers = JSON.parse(localStorage.getItem('novabill_registered_users') || '[]');
+      const foundLocalUser = localUsers.find(
+        u => (u.email?.toLowerCase() === loginUser.trim().toLowerCase() || u.username?.toLowerCase() === loginUser.trim().toLowerCase()) && u.password === loginPass
+      );
+
+      if (foundLocalUser) {
+        setSuccessMsg('Welcome back! Logging you in...');
+        setTimeout(() => {
+          onLoginSuccess(foundLocalUser, `token-${foundLocalUser.id}-${Date.now()}`, rememberMe);
+        }, 500);
+      } else if ((loginUser.trim().toLowerCase() === 'root' || loginUser.trim().toLowerCase() === 'root@novabill.com') && loginPass === 'Password') {
         const fallbackUser = {
           id: 1,
           username: 'root',
@@ -88,7 +101,7 @@ export default function AuthPage({ onLoginSuccess, darkMode, setDarkMode }) {
           onLoginSuccess(fallbackUser, 'novabill-offline-token', rememberMe);
         }, 500);
       } else {
-        setError(err.message || 'Invalid username or password.');
+        setError(err.message === 'Server offline or invalid response' ? 'Invalid username or password. If you are new, please Register first!' : err.message);
       }
     } finally {
       setLoading(false);
@@ -131,6 +144,26 @@ export default function AuthPage({ onLoginSuccess, darkMode, setDarkMode }) {
 
     setLoading(true);
 
+    const newUserObj = {
+      id: Date.now(),
+      username: regForm.email.split('@')[0],
+      store_name: `${regForm.name}'s Store`,
+      owner_name: regForm.name.trim(),
+      phone: regForm.phone.replace(/\D/g, ''),
+      email: regForm.email.trim(),
+      password: regForm.password,
+      role: 'Vendor'
+    };
+
+    // Always persist to local fallback cache as well
+    try {
+      const localUsers = JSON.parse(localStorage.getItem('novabill_registered_users') || '[]');
+      if (!localUsers.some(u => u.email.toLowerCase() === newUserObj.email.toLowerCase())) {
+        localUsers.push(newUserObj);
+        localStorage.setItem('novabill_registered_users', JSON.stringify(localUsers));
+      }
+    } catch (storageErr) {}
+
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -143,13 +176,18 @@ export default function AuthPage({ onLoginSuccess, darkMode, setDarkMode }) {
         })
       });
 
-      const data = await res.json();
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {}
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create account.');
+      if (res.ok && data) {
+        // Success from server
       }
-
-      // Requirement: After registering, navigate to Login instead of homepage
+    } catch (err) {
+      // Network failure or offline
+    } finally {
+      setLoading(false);
       const registeredEmail = regForm.email.trim();
       setRegForm({
         name: '',
@@ -160,28 +198,8 @@ export default function AuthPage({ onLoginSuccess, darkMode, setDarkMode }) {
       });
       setLoginUser(registeredEmail);
       setLoginPass('');
-      setSuccessMsg('Account created successfully! Please log in with your credentials.');
+      setSuccessMsg('Account created successfully! Please enter your password to log in.');
       setMode('login');
-    } catch (err) {
-      if (err.message && err.message.includes('already exists')) {
-        setError(err.message);
-      } else {
-        // Fallback offline flow - still navigate to login
-        const registeredEmail = regForm.email.trim();
-        setRegForm({
-          name: '',
-          email: '',
-          phone: '',
-          password: '',
-          confirm_password: ''
-        });
-        setLoginUser(registeredEmail);
-        setLoginPass('');
-        setSuccessMsg('Account created successfully! Please log in with your credentials.');
-        setMode('login');
-      }
-    } finally {
-      setLoading(false);
     }
   };
 

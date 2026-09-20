@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
 
-const jsonBackupPath = path.join(__dirname, 'db_data.json');
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const jsonBackupPath = isVercel ? path.join('/tmp', 'db_data.json') : path.join(__dirname, 'db_data.json');
+const seedBackupPath = path.join(__dirname, 'db_data.json');
 
 let mysqlPool = null;
 let isMysqlAvailable = false;
@@ -30,9 +32,10 @@ let store = {
 };
 
 function loadJsonStore() {
-  if (fs.existsSync(jsonBackupPath)) {
+  const targetPath = fs.existsSync(jsonBackupPath) ? jsonBackupPath : (fs.existsSync(seedBackupPath) ? seedBackupPath : null);
+  if (targetPath) {
     try {
-      const content = fs.readFileSync(jsonBackupPath, 'utf8');
+      const content = fs.readFileSync(targetPath, 'utf8');
       const loaded = JSON.parse(content);
       store = { ...store, ...loaded };
       if (!store.users || store.users.length === 0) {

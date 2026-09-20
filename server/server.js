@@ -200,6 +200,10 @@ ${bill.due_amount > 0 ? `⚠️ *Note:* Kindly clear the pending balance of *₹
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`⚡ Backend E-Bill Server running on http://localhost:${PORT}`);
-});
+if (require.main === module || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`⚡ Backend E-Bill Server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
